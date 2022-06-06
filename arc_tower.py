@@ -3,7 +3,7 @@ import sys
 import ac
 import acsys
 import os
-
+import json
 
 import math
 import time
@@ -41,27 +41,6 @@ ac.log("{}".format(listOfActorToHide))
 appName = "ARC - Tower"
 mainWindow = 0
 
-def convertMillisToSecondsMillis(millis):
-    seconds = millis
-    return seconds
-def convertMillisToMinutesSecondsMillis(millis):
-    minutes = math.floor(millis/60)
-    raw_seconds = math.floor(millis)
-    seconds = millis - (minutes*60)
-    seconds = round(seconds,3)
-    return minutes,seconds
-def convertMillisToMinutesSeconds(millis):
-    minutes = math.floor(millis/60)
-    raw_seconds = math.floor(millis)
-    seconds = millis - (minutes*60)
-    seconds = math.floor(seconds)
-    if minutes > 60:
-        floored_minutes = math.floor(minutes/60)
-        seconds = minutes - (floored_minutes*60)
-        minutes = "{}h".format(floored_minutes)
-    else:
-        minutes = "{}:".format(minutes)
-    return minutes,seconds
 
 class Label:
     def __init__(self,window):
@@ -114,6 +93,18 @@ class Driver:
         self.pb_s3 = 9999999
         self.pb_lap = 9999999
 
+        #Gates
+        self.gate_0 = [0, 0]
+        self.gate_1 = [0, 0]
+        self.gate_2 = [0, 0]
+        self.gate_3 = [0, 0]
+        self.gate_4 = [0, 0]
+        self.gate_5 = [0, 0]
+        self.gate_6 = [0, 0]
+        self.gate_7 = [0, 0]
+        self.gate_8 = [0, 0]
+
+
 # --- TOWER VAR ---
 allDrivers = {}
 allLabels = {}
@@ -128,6 +119,21 @@ leaderboard = []
 # -- LABEL VAR ---
 fontSize = 20
 animateSpeed = 2
+
+# -- GATES ---
+gate_0 = 0
+gate_1 = 0
+gate_2 = 0
+gate_3 = 0
+gate_4 = 0
+gate_5 = 0
+gate_6 = 0
+gate_7 = 0
+gate_8 = 0
+sector_1 = 0
+sector_2 = 0
+##############################
+##############################
 
 verticalLbl = fontSize
 #SESSION
@@ -148,6 +154,8 @@ raceOptionLbl_left = nameLbl_left + nameLbl_width
       
 def acMain(ac_versions):
     global mainWindow, sessionLbl_name, sessionLbl_time
+    global config, sector_1, sector_2
+    global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     
     main_size_x = 250
     main_size_y = 1000
@@ -174,7 +182,39 @@ def acMain(ac_versions):
     #ac.setPosition(modeLbl,0,modeLbl_y_pos)
     #ac.setFontSize(modeLbl,fontSize*1)
     #ac.setFontAlignment(modeLbl,"center")
-    
+
+    #################################################
+    # -- GET TRACK SETTINGS -- #
+    t_track = ac.getTrackName(0)
+    if t_track in config['TRACKS']:
+        t_sectors = json.loads(config.get("TRACKS",t_track))
+        sector_1 = t_sectors[0]
+        sector_2 = t_sectors[1]
+        ac.log("Setting-up for {}".format(t_track))
+    else:
+        t_sectors = json.loads(config.get("TRACKS","default"))
+        sector_1 = t_sectors[0]
+        sector_2 = t_sectors[1]
+        ac.log("Setting-up as default")
+
+    # -- SET GATES -- #
+    t_sector1_section = sector_1/3
+    gate_1 = t_sector1_section
+    gate_2 = t_sector1_section*2
+    gate_3 = sector_1
+    ac.log("Gate(1-3):{}".format(gate_1,gate_2,gate_3))
+
+    t_sector2_section = (sector_2-sector_1)/3
+    gate_4 = gate_3+t_sector2_section
+    gate_5 = gate_4+t_sector2_section
+    gate_6 = sector_2
+    ac.log("Gate(4-6):{}".format(gate_4, gate_5, gate_6))
+
+    t_sector3_section = (1-sector_2)/3
+    gate_7 = gate_6 + t_sector3_section
+    gate_8 = gate_7 + t_sector3_section
+    ac.log("Gate(7-8):{}".format(gate_7, gate_8))
+
     return appName    
 def acUpdate(deltaT):
     global mainWindow, sessionLbl_name, sessionLbl_time
@@ -325,6 +365,9 @@ def acUpdate(deltaT):
     if currentUpdateTime >= nextUpdate:        
         nextUpdate = time.time() + refreshRate
 
+##############################
+##############################
+
 def findLeader():
     
     try:
@@ -347,20 +390,20 @@ def findAhead(source, carCount):
             attempt = 0
             #Find source car's position for reference
             s_pos = ac.getCarRealTimeLeaderboardPosition(source)+1
-            
+            ac.log("CC:{}".format(carCount))
             if (s_pos-1) > 0: #If source car's position -1 is 0, then that car is in first...
-                while attempt<maxAttempt:
+                while True:
                     for i in range(carCount): #For each cars...
                         i_pos = ac.getCarRealTimeLeaderboardPosition(i)+1 #Get "i"'s position on the leaderboard (+1 to get real position) 
                         if i_pos == (s_pos-offset): #If "i"'s position is equal to source-car's position minus current offset...
                             if ac.getDriverName(i) in listOfActorToHide: #If "i" is a car that must be ignored (eg. ARC-TV)...
-                                offset+=1 #Increase the offset by one...
-                                #ac.log("{}@{}".format(offset,time.time()))
+                                offset += 1 #Increase the offset by one...
                             else:
                                 ahead = i #We found our guy!
                                 return ahead #Return it and carry on...
-                    attempt+=1
-                    #ac.log("{}".format(attempt))
+                        elif (s_pos-offset) <= 0:
+                            return "None"
+                    attempt += 1
             return "None" #Source-car is in first, what else do you what from me?         
         except :
             #In-case shit hits the fan, I wanna know why!
@@ -431,3 +474,25 @@ def animatePosMove(label):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ animatePosMove()")
         ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+def convertMillisToSecondsMillis(millis):
+    seconds = millis
+    return seconds
+def convertMillisToMinutesSecondsMillis(millis):
+    minutes = math.floor(millis/60)
+    raw_seconds = math.floor(millis)
+    seconds = millis - (minutes*60)
+    seconds = round(seconds,3)
+    return minutes,seconds
+def convertMillisToMinutesSeconds(millis):
+    minutes = math.floor(millis/60)
+    raw_seconds = math.floor(millis)
+    seconds = millis - (minutes*60)
+    seconds = math.floor(seconds)
+    if minutes > 60:
+        floored_minutes = math.floor(minutes/60)
+        seconds = minutes - (floored_minutes*60)
+        minutes = "{}h".format(floored_minutes)
+    else:
+        minutes = "{}:".format(minutes)
+    return minutes,seconds
+
