@@ -94,6 +94,7 @@ class Driver:
         self.pb_lap = 9999999
 
         #Gates
+        self.gate_current = -1
         self.gate_0 = [0, 0]
         self.gate_1 = [0, 0]
         self.gate_2 = [0, 0]
@@ -110,7 +111,7 @@ allDrivers = {}
 allLabels = {}
 currentSession = -1
 currentSessionStrg = ''
-raceOptionnalEnum = 2
+raceOptionnalEnum = 0
 trackLength = 0
 nextUpdate = 0
 currentUpdateTime = 0
@@ -222,6 +223,9 @@ def acUpdate(deltaT):
     global currentSession, currentSessionStrg, trackLength
     global raceOptionnalEnum
     global nextUpdate, refreshRate, currentUpdateTime
+    global config, sector_1, sector_2
+    global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
+
     currentUpdateTime = time.time()
     
     currentSession = info.graphics.session
@@ -274,6 +278,49 @@ def acUpdate(deltaT):
         if ac.getDriverName(idxB) in listOfActorToHide:
             continue #Go to next driver...
 
+        ############## Update gates ##############
+        t_currentSplinePos = ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition)
+        t_currentGate = allDrivers[idxB].gate_current
+        t_currentLap = ac.getCarState(idxB,acsys.CS.LapCount)
+        if t_currentSplinePos >= 0 and t_currentSplinePos < gate_1: #If is past Start/Finish but not gate 1...
+            if t_currentGate != 0: #If self.currentGate is has not been updated...
+                allDrivers[idxB].gate_current = 0
+                allDrivers[idxB].gate_0 = [time.time(),t_currentLap]
+        elif t_currentSplinePos >= gate_1 and t_currentSplinePos < gate_2:
+            if t_currentGate != 1:
+                allDrivers[idxB].gate_current = 1
+                allDrivers[idxB].gate_1 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_2 and t_currentSplinePos < gate_3:
+            if t_currentGate != 2:
+                allDrivers[idxB].gate_current = 2
+                allDrivers[idxB].gate_2 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_3 and t_currentSplinePos < gate_4:
+            if t_currentGate != 3:
+                allDrivers[idxB].gate_current = 3
+                allDrivers[idxB].gate_3 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_4 and t_currentSplinePos < gate_5:
+            if t_currentGate != 4:
+                allDrivers[idxB].gate_current = 4
+                allDrivers[idxB].gate_4 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_5 and t_currentSplinePos < gate_6:
+            if t_currentGate != 5:
+                allDrivers[idxB].gate_current = 5
+                allDrivers[idxB].gate_5 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_6 and t_currentSplinePos < gate_7:
+            if t_currentGate != 6:
+                allDrivers[idxB].gate_current = 6
+                allDrivers[idxB].gate_6 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_7 and t_currentSplinePos < gate_8:
+            if t_currentGate != 7:
+                allDrivers[idxB].gate_current = 7
+                allDrivers[idxB].gate_7 = [time.time(), t_currentLap]
+        elif t_currentSplinePos >= gate_8 and t_currentSplinePos < 1:
+            if t_currentGate != 8:
+                allDrivers[idxB].gate_current = 8
+                allDrivers[idxB].gate_8 = [time.time(), t_currentLap]
+        ########################################################
+
+
         ############## FIND POSITION OF 'idxB' ##############
         #Refresh t_pos and get temporary 'driver ahead'
         t_pos = -1
@@ -315,10 +362,8 @@ def acUpdate(deltaT):
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
 
-        #if currentSession  -1: # TO-DO update to use properly based on current session
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
             ac.setVisible(t_intervalLbl,1)
-            #ac.setText(modeLbl,"INTERVAL")
             t_carChaserCurrentLap = ac.getCarState(idxB,acsys.CS.LapCount)
             ac.setPosition(t_intervalLbl,raceOptionLbl_left,t_Lbl_y)
             if currentUpdateTime >= nextUpdate:
@@ -330,7 +375,8 @@ def acUpdate(deltaT):
                 if  t_carAhead != "None" and (t_carAheadCurrentLap-t_carChaserCurrentLap > 1): #If lapped
                     ac.setText(t_intervalLbl,"+{} L".format((t_carAheadCurrentLap-t_carChaserCurrentLap)))
                 elif t_carAhead != "None":  
-                    intervalToLabel(t_intervalLbl,t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),(ac.getCarState(idxB,acsys.CS.SpeedMS)+ac.getCarState(t_carAhead,acsys.CS.SpeedMS))/2)
+                    #intervalToLabel(t_intervalLbl,t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),(ac.getCarState(idxB,acsys.CS.SpeedMS)+ac.getCarState(t_carAhead,acsys.CS.SpeedMS))/2)
+                    intervalToLabel_gate(t_intervalLbl, idxB, t_carAhead)
                 else:
                     ac.setText(t_intervalLbl,"INTERVAL")
                 ac.setFontAlignment(t_intervalLbl,"right")
@@ -351,15 +397,15 @@ def acUpdate(deltaT):
                     ac.setText(t_gapToLeadLbl,"+{} L".format((t_carAheadCurrentLap-t_carChaserCurrentLap)))
                 elif t_carAhead != "None": 
                     t_carAhead = findLeader()
-                    intervalToLabel(t_gapToLeadLbl,
-                                    t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),
-                                    idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),
-                                    (ac.getCarState(idxB,acsys.CS.SpeedMS)+ac.getCarState(t_carAhead,acsys.CS.SpeedMS))/2)
-                    #intervalToLabel(t_gapToLeadLbl,t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),(ac.getCarState(idxB,acsys.CS.SpeedMS)))
-                    #intervalToLabel(t_gapToLeadLbl,t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),(ac.getCarState(t_carAhead,acsys.CS.SpeedMS)))
+                    if allDrivers[idxB].gate_current == -1:
+                        pass
+                    else:
+                        intervalToLabel_gate(t_gapToLeadLbl,idxB,t_carAhead)
                 else:
                     ac.setText(t_gapToLeadLbl,"LEADER")
                 ac.setFontAlignment(t_gapToLeadLbl,"right")
+        else:
+            ac.setVisible(t_gapToLeadLbl, 0)
         if raceOptionnalEnum == 2:
             pass
     if currentUpdateTime >= nextUpdate:        
@@ -495,4 +541,35 @@ def convertMillisToMinutesSeconds(millis):
     else:
         minutes = "{}:".format(minutes)
     return minutes,seconds
+def intervalToLabel_gate(label,from_id,to_id):
+    try:
+        t_from_gate = allDrivers[from_id].gate_current
+        t_from_gate_arr = getGateValueOfCar(from_id,t_from_gate)
+        t_from_gate_time = t_from_gate_arr[0]
+        t_from_gate_lap = t_from_gate_arr[1]
+
+        t_ahead_gate_arr = getGateValueOfCar(to_id,t_from_gate)
+        t_ahead_gate_time = t_ahead_gate_arr[0]
+        t_ahead_gate_lap = t_ahead_gate_arr[1]
+
+        if t_from_gate_lap == t_ahead_gate_lap: #If cars are on the same lap...
+            ac.setText(label,"{:+.1f}".format(t_from_gate_time-t_ahead_gate_time))
+        else: #Otherwise they are not on the same lap...
+            ac.setText(label,"{} L".format(t_ahead_gate_lap-t_from_gate_lap))
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ intervalToLabel_gate()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+    pass
+def getGateValueAheadCar(ahead_id,gateNumber):
+    string = ("gate_" + str(gateNumber))
+    return getattr(allDrivers[ahead_id],string)
+def getGateValueOfCar(id,gateNumber):
+    try:
+        string = ("gate_" + str(gateNumber))
+        return getattr(allDrivers[id],string)
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ getGateValueOfCar()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
