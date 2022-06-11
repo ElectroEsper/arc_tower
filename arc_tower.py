@@ -33,6 +33,8 @@ config = configparser.ConfigParser()
 config.read(configfile)
 #config.read('arc_tower.ini')
 listOfActorToHide = config['CASTER']['toHide']
+#tyreChangeTime = float(config['CAR']['tyreChangeTime'])
+tyreChangeTime = json.loads(config.get("CAR","tyreChangeTime"))
 ac.log("{}".format(listOfActorToHide))
 
 
@@ -68,6 +70,22 @@ class Label:
         self.gapToLeadLbl = ac.addLabel(window,"")
         ac.setFontSize(self.gapToLeadLbl,fontSize)
         ac.setVisible(self.gapToLeadLbl,0)
+        ##Tyre/Stint
+        ###BG
+        self.stintLbl_bg = ac.addLabel(window,"")
+        ac.setVisible(self.stintLbl_bg, 0)
+        ac.setFontAlignment(self.stintLbl_bg, "right")
+        ###Text
+        self.stintLbl_txt = ac.addLabel(window,"")
+        ac.setFontSize(self.stintLbl_txt, fontSize)
+        ac.setVisible(self.stintLbl_txt, 0)
+        ac.setFontAlignment(self.stintLbl_txt,"right")
+
+        #Driver Status
+        self.inPit = ac.addLabel(window,"")
+        ac.setFontSize(self.inPit,fontSize)
+        ac.setFontAlignment(self.inPit,"left")
+
 class Driver:
     def __init__(self,id):
         self.startPosition = -1
@@ -105,13 +123,30 @@ class Driver:
         self.gate_7 = [0, 0]
         self.gate_8 = [0, 0]
 
+        #Tyre
+        self.currentTyre = 0
+        self.currentStintSinceLap = 0
+        self.currentStintLenght = 0
+
+        #Pitstops
+        self.inPitLane = False
+        self.pitTimerStart = 0
+        self.pitTimer = 0
+
+        self.inPitBox = False
+        self.inPitBoxTimerStart = 0
+        self.inPitBoxTimer = 0
+
+        self.lastPitTime = 0
+        self.pitStop = 0
+
 
 # --- TOWER VAR ---
 allDrivers = {}
 allLabels = {}
 currentSession = -1
 currentSessionStrg = ''
-raceOptionnalEnum = 0
+raceOptionnalEnum = 2
 trackLength = 0
 nextUpdate = 0
 currentUpdateTime = 0
@@ -120,6 +155,7 @@ leaderboard = []
 # -- LABEL VAR ---
 fontSize = 20
 animateSpeed = 2
+longestName = 0
 
 # -- GATES ---
 gate_0 = 0
@@ -133,10 +169,17 @@ gate_7 = 0
 gate_8 = 0
 sector_1 = 0
 sector_2 = 0
+
+# -- Tyre Compound -- #
+bgpath_tyre_s = None
+bgpath_tyre_m = None
+bgpath_tyre_h = None
+tyre_icon_x = 25
+tyre_icon_y = 25
 ##############################
 ##############################
 
-verticalLbl = fontSize
+verticalLbl = fontSize*1.2
 #SESSION
 sessionLbl_width = fontSize*2
 
@@ -148,16 +191,25 @@ positionLbl_left = positionLbl_width
 
 #NAME
 nameLbl_left = positionLbl_left + positionLbl_width
-nameLbl_width = 250
+nameLbl_width = longestName+50
 
 #Race optionnal
 raceOptionLbl_left = nameLbl_left + nameLbl_width
-      
+## Compound
+tyreCompound_width = 70+20
+
+#Pitstop
+pitstop_width = fontSize
+
+#Size Mult
+sizeMult = 1
+
 def acMain(ac_versions):
     global mainWindow, sessionLbl_name, sessionLbl_time
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
-    
+    global img_tyre_s, img_tyre_m, img_tyre_h
+
     main_size_x = 250
     main_size_y = 1000
     #Main
@@ -215,19 +267,31 @@ def acMain(ac_versions):
     gate_7 = gate_6 + t_sector3_section
     gate_8 = gate_7 + t_sector3_section
     ac.log("Gate(7-8):{}".format(gate_7, gate_8))
+    #################################################
+
+    # HANDLE Sprites #
+    img_tyre_s = os.path.dirname(__file__) + '/img/bg_tyre_soft.png'
+    img_tyre_m = os.path.dirname(__file__) + '/img/bg_tyre_medium.png'
+    img_tyre_h = os.path.dirname(__file__) + '/img/bg_tyre_hard.png'
 
     return appName    
 def acUpdate(deltaT):
     global mainWindow, sessionLbl_name, sessionLbl_time
-    global positionLbl_left, nameLbl_left
+    global positionLbl_left, nameLbl_left, nameLbl_width, raceOptionLbl_left
     global currentSession, currentSessionStrg, trackLength
     global raceOptionnalEnum
     global nextUpdate, refreshRate, currentUpdateTime
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
+    global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
+    global longestName
 
     currentUpdateTime = time.time()
-    
+
+    #Check if session changed...
+    if currentSession != info.graphics.session:
+        currentSession = info.graphics.session
+
     currentSession = info.graphics.session
     
     trackLength = ac.getTrackLength(0)
@@ -237,7 +301,9 @@ def acUpdate(deltaT):
             currentSessionStrg = "QUALY"
     elif currentSession==2 :
             currentSessionStrg = "LAP"
-    
+
+
+
     t_mainWindow_pos_x = ac.getPosition(mainWindow)[0]
     t_mainWindow_pos_y = ac.getPosition(mainWindow)[1]
     
@@ -271,6 +337,11 @@ def acUpdate(deltaT):
                 allLabels.update({idx:Label(mainWindow)})
                 allDrivers[idx].lblId = idx
 
+    # SETUP LONGEST NAME #
+    longestName = getLongestGame(totalDrivers)
+    nameLbl_width = (longestName*(fontSize*1))
+    raceOptionLbl_left = nameLbl_left + nameLbl_width
+    #ac.log("{}".format(nameLbl_width))
     #Update driver's data
     for idxB in range(totalDrivers):
         
@@ -318,8 +389,18 @@ def acUpdate(deltaT):
             if t_currentGate != 8:
                 allDrivers[idxB].gate_current = 8
                 allDrivers[idxB].gate_8 = [time.time(), t_currentLap]
-        ########################################################
 
+        ########################################################
+        ############## Update compound ##############
+        t_currentCompound = ac.getCarTyreCompound(idxB)
+
+        if t_currentCompound != allDrivers[idxB].currentTyre: #If new compound...
+            allDrivers[idxB].currentTyre = t_currentCompound
+            allDrivers[idxB].currentStintSinceLap = ac.getCarState(idxB,acsys.CS.LapCount)
+            allDrivers[idxB].currentStintLenght = 0
+        else:
+            allDrivers[idxB].currentStintLenght = ac.getCarState(idxB,acsys.CS.LapCount) - allDrivers[idxB].currentStintSinceLap
+        ########################################################
 
         ############## FIND POSITION OF 'idxB' ##############
         #Refresh t_pos and get temporary 'driver ahead'
@@ -332,7 +413,33 @@ def acUpdate(deltaT):
             t_pos = allDrivers[t_driver_ahead].currentPos+1
              
         ########################################################
-        
+
+        ############## IS 'idxB' in the pits ##############
+        if ac.isCarInPitlane(idxB) and not allDrivers[idxB].inPitLane: #If in pitlane and inPitLane is not true...
+            allDrivers[idxB].inPitLane = True #...Set inPitLane true...
+            allDrivers[idxB].pitTimerStart = time.time() #...Start pitTimerStart
+        elif not ac.isCarInPitlane(idxB) and allDrivers[idxB].inPitLane: #Else-if not in pitlane and inPitLane is true...
+            allDrivers[idxB].inPitLane = False #...Set inPitLane false...
+            allDrivers[idxB].pitTimer = time.time() - allDrivers[idxB].pitTimerStart #...update pitTimer
+            allDrivers[idxB].lastPitTime = allDrivers[idxB].pitTimer #...update lastPitTime
+        if allDrivers[idxB].inPitLane: #If inPitLane is true...
+            allDrivers[idxB].pitTimer = time.time() - allDrivers[idxB].pitTimerStart #...update pitTimer
+            ac.log("{} - Pit Timer : {}".format(idxB,allDrivers[idxB].pitTimer))
+            if ac.getCarState(idxB,acsys.CS.SpeedMS)<1 and not allDrivers[idxB].inPitBox:#...if speed is < 1 mps...
+                allDrivers[idxB].inPitBox = True #...assume car is in pitBox
+                allDrivers[idxB].inPitBoxTimerStart = time.time()  # ...set inPitBoxTimerStart
+            elif ac.getCarState(idxB,acsys.CS.SpeedMS)>=1 and allDrivers[idxB].inPitBox: #If car is moving and inPitBox...
+                allDrivers[idxB].inPitBox = False #...assume car is not in pitbox
+                allDrivers[idxB].inPitBoxTimer = time.time() - allDrivers[idxB].inPitBoxTimerStart
+                if allDrivers[idxB].inPitBoxTimer >= tyreChangeTime: #If stayed in box long enough to change tyres...
+                    allDrivers[idxB].currentStintSinceLap = ac.getCarState(idxB,acsys.CS.LapCount) #...assume tyres where changed...
+                    allDrivers[idxB].pitStop += 1 #...update pitstop count...
+        if allDrivers[idxB].inPitBox: #If car is in pitbox...
+            allDrivers[idxB].inPitBoxTimer = time.time() - allDrivers[idxB].inPitBoxTimerStart  # ...update inPitBoxTimer
+
+
+
+        ########################################################
         t_lbl_id = allDrivers[idxB].lblId #Fetch driver's label id
         t_label = allLabels[t_lbl_id] #Fetch label from id
         t_carAhead = t_driver_ahead #setup updated car ahead
@@ -343,6 +450,9 @@ def acUpdate(deltaT):
         t_nameLbl = t_label.nameLbl
         t_intervalLbl = t_label.intervalLbl
         t_gapToLeadLbl = t_label.gapToLeadLbl
+        t_stintLbl_bg = t_label.stintLbl_bg
+        t_stintLbl_txt = t_label.stintLbl_txt
+        t_pitstopLbl = t_label.inPit
         #animate on position change
         if t_pos != allDrivers[idxB].currentPos: #If position changed.
             allDrivers[idxB].currentPos = t_pos
@@ -359,6 +469,7 @@ def acUpdate(deltaT):
         
         #Set name
         ac.setPosition(t_nameLbl,nameLbl_left,t_Lbl_y)
+        #ac.setSize(t_nameLbl,nameLbl_width-100,fontSize)
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
 
@@ -407,7 +518,43 @@ def acUpdate(deltaT):
         else:
             ac.setVisible(t_gapToLeadLbl, 0)
         if raceOptionnalEnum == 2:
-            pass
+            ac.setVisible(t_stintLbl_bg, 1)
+            ac.setVisible(t_stintLbl_txt,1)
+            ac.setPosition(t_stintLbl_txt,raceOptionLbl_left,t_Lbl_y)
+            ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width, t_Lbl_y+3)
+            #ac.setText(t_stintLbl,"test")
+            if currentUpdateTime >= nextUpdate:
+                t_currentTyre = allDrivers[idxB].currentTyre
+                ac.setText(t_stintLbl_txt, "{} Laps".format(allDrivers[idxB].currentStintLenght))
+                #ac.log("{}".format(t_currentTyre))
+                t_currentStingLenght = allDrivers[idxB].currentStintLenght
+                if t_currentTyre == "S":
+                    ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_s)
+                    ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
+                elif t_currentTyre == "M":
+                    ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_m)
+                    ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
+                elif t_currentTyre == "H":
+                    ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_h)
+                    ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
+                else:
+                    ac.setBackgroundTexture(t_stintLbl_bg,"")
+        else:
+            ac.setVisible(t_stintLbl_bg,0)
+            ac.setVisible(t_stintLbl_txt,0)
+
+        if allDrivers[idxB].inPitLane and ac.isConnected(idxB):
+            ac.setVisible(t_pitstopLbl,1)
+            ac.setPosition(t_pitstopLbl,raceOptionLbl_left+pitstop_width,t_Lbl_y)
+            ac.setText(t_pitstopLbl,"P")
+        elif not ac.isConnected(idxB):
+            ac.setVisible(t_pitstopLbl, 1)
+            ac.setPosition(t_pitstopLbl, raceOptionLbl_left + pitstop_width, t_Lbl_y)
+            ac.setText(t_pitstopLbl, "D")
+        else:
+            ac.setVisible(t_pitstopLbl,0)
+
+
     if currentUpdateTime >= nextUpdate:        
         nextUpdate = time.time() + refreshRate
 
@@ -436,7 +583,7 @@ def findAhead(source, carCount):
             attempt = 0
             #Find source car's position for reference
             s_pos = ac.getCarRealTimeLeaderboardPosition(source)+1
-            ac.log("CC:{}".format(carCount))
+            #ac.log("CC:{}".format(carCount))
             if (s_pos-1) > 0: #If source car's position -1 is 0, then that car is in first...
                 while True:
                     for i in range(carCount): #For each cars...
@@ -572,4 +719,16 @@ def getGateValueOfCar(id,gateNumber):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ getGateValueOfCar()")
         ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
-
+def getLongestGame(carCount):
+    try:
+        t_longestName = 0
+        for i in range(carCount):
+            t_lenght = len(getLastName(ac.getDriverName(i)))
+            if t_lenght > t_longestName:
+                t_longestName = t_lenght
+        ac.log("Longest Name : {}".format(t_longestName))
+        return t_longestName
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ getLongestGame()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
