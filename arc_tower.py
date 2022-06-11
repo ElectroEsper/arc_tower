@@ -25,6 +25,9 @@ import ctypes
 
 from sim_info_lib.sim_info import info
 
+# TODO : Change handling of position to a custom solution instead; Maybe use (lapCount*TrackLenght) + (SplinePos * TrackLenght), then sort them based on that.
+#
+
 # HANDLE .INI File #
 #configfile = os.path.join(os.path.dirname(__file__), 'arc_tower.ini')
 configfile = "apps\\python\\arc_tower\\arc_tower.ini"
@@ -89,6 +92,7 @@ class Label:
 class Driver:
     def __init__(self,id):
         self.startPosition = -1
+        self.previousPos = -1
         self.currentPos = -1
         self.driverAheadId = -1
         
@@ -140,6 +144,8 @@ class Driver:
         self.lastPitTime = 0
         self.pitStop = 0
 
+        #Total distance traveled
+        self.distanceTraveled = 0
 
 # --- TOWER VAR ---
 allDrivers = {}
@@ -152,6 +158,7 @@ nextUpdate = 0
 currentUpdateTime = 0
 refreshRate = 0.1
 leaderboard = []
+leaderboardDict = {}
 # -- LABEL VAR ---
 fontSize = 20
 animateSpeed = 2
@@ -174,8 +181,8 @@ sector_2 = 0
 bgpath_tyre_s = None
 bgpath_tyre_m = None
 bgpath_tyre_h = None
-tyre_icon_x = 25
-tyre_icon_y = 25
+tyre_icon_x = 26
+tyre_icon_y = 26
 ##############################
 ##############################
 
@@ -284,13 +291,15 @@ def acUpdate(deltaT):
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
-    global longestName
+    global longestName, allDrivers, allLabels
 
     currentUpdateTime = time.time()
 
     #Check if session changed...
     if currentSession != info.graphics.session:
         currentSession = info.graphics.session
+        allDrivers = {}
+        allLabels = {}
 
     currentSession = info.graphics.session
     
@@ -330,6 +339,7 @@ def acUpdate(deltaT):
                 pass
             else:
                 allDrivers.update({idx:Driver(idx)})
+                leaderboard.append([allDrivers[idx].id,allDrivers[idx].distanceTraveled])
         if not idx in allLabels.keys():
             if False:
                 pass
@@ -341,6 +351,33 @@ def acUpdate(deltaT):
     longestName = getLongestGame(totalDrivers)
     nameLbl_width = (longestName*(fontSize*1))
     raceOptionLbl_left = nameLbl_left + nameLbl_width
+
+    #Update leaderboard
+    for idxC in range(len(leaderboard)): # idxC = [carId,distance]
+        t_carId = leaderboard[idxC][0]
+        t_lapCount = ac.getCarState(t_carId,acsys.CS.LapCount)
+        t_splinePos = ac.getCarState(t_carId,acsys.CS.NormalizedSplinePosition)
+        if (t_lapCount == allDrivers[t_carId].CompletedLap) and (t_splinePos < 0.1): #If lapcount didn't update yet...
+            t_distanceTravel = (t_lapCount * trackLength) + ((1 + t_splinePos) * trackLength)
+            allDrivers[t_carId].distanceTraveled = t_distanceTravel
+        else:
+            t_distanceTravel = (t_lapCount*trackLength) + (t_splinePos*trackLength)
+            allDrivers[t_carId].distanceTraveled = t_distanceTravel
+        #ac.log("{}".format(t_carId))
+        leaderboard[idxC][1] = t_distanceTravel
+    leaderboard.sort(key=sortByDistance,reverse=True)
+    for idxD in range(len(leaderboard)):
+        leaderboard_pos_key = str(idxD+1)
+        leaderboardDict[leaderboard_pos_key] = leaderboard[idxD][0]
+    #ac.log("{}".format(leaderboard))
+    for each in range(len(leaderboard)):
+        ac.log("-------")
+        ac.log("A -Pos:{} - {}".format(each+1,leaderboard[each]))
+        ac.log("B -Lap:{} - Spline: {}".format(ac.getCarState(leaderboard[each][0],acsys.CS.LapCount),ac.getCarState(leaderboard[each][0],acsys.CS.NormalizedSplinePosition)))
+        ac.log("^^^^^^^")
+        ac.log("")
+        ac.log("")
+
     #ac.log("{}".format(nameLbl_width))
     #Update driver's data
     for idxB in range(totalDrivers):
@@ -350,6 +387,7 @@ def acUpdate(deltaT):
             continue #Go to next driver...
 
         ############## Update gates ##############
+
         t_currentSplinePos = ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition)
         t_currentGate = allDrivers[idxB].gate_current
         t_currentLap = ac.getCarState(idxB,acsys.CS.LapCount)
@@ -357,6 +395,15 @@ def acUpdate(deltaT):
             if t_currentGate != 0: #If self.currentGate is has not been updated...
                 allDrivers[idxB].gate_current = 0
                 allDrivers[idxB].gate_0 = [time.time(),t_currentLap]
+                # If acsys.CS.LapCount hasn't updated yet...
+                #if allDrivers[idxB].CompletedLap == ac.getCarState(idxB, acsys.CS.LapCount):
+                #    t_distanceTravel = (t_lapCount * trackLength) + ((1 + ac.getCarState(t_carId, acsys.CS.NormalizedSplinePosition)) * trackLength)
+                #    allDrivers[t_carId].distanceTraveled = t_distanceTravel
+            #if t_currentGate == 0:
+                #If acsys.CS.LapCount hasn't updated yet...
+               # if allDrivers[idxB].CompletedLap == ac.getCarState(idxB,acsys.CS.LapCount):
+                  #  t_distanceTravel = (t_lapCount * trackLength) + ( (1+ac.getCarState(t_carId, acsys.CS.NormalizedSplinePosition)) * trackLength)
+                  #  allDrivers[t_carId].distanceTraveled = t_distanceTravel
         elif t_currentSplinePos >= gate_1 and t_currentSplinePos < gate_2:
             if t_currentGate != 1:
                 allDrivers[idxB].gate_current = 1
@@ -389,6 +436,8 @@ def acUpdate(deltaT):
             if t_currentGate != 8:
                 allDrivers[idxB].gate_current = 8
                 allDrivers[idxB].gate_8 = [time.time(), t_currentLap]
+                allDrivers[idxB].CompletedLap = t_currentLap
+
 
         ########################################################
         ############## Update compound ##############
@@ -404,13 +453,17 @@ def acUpdate(deltaT):
 
         ############## FIND POSITION OF 'idxB' ##############
         #Refresh t_pos and get temporary 'driver ahead'
-        t_pos = -1
+        t_pos = int(findDictKeyFromValue(idxB,leaderboardDict))
+        #allDrivers[idxB].currentPos = int(findDictKeyFromValue(idxB,leaderboardDict))
         t_driver_ahead = findAhead(idxB,ac.getCarsCount())
         #ac.log("{}".format(t_driver_ahead))
-        if t_driver_ahead=="None": #If driver is leader...
-            t_pos = 1
-        else: #If none of the above...
-            t_pos = allDrivers[t_driver_ahead].currentPos+1
+        #if t_driver_ahead=="None": #If driver is leader...
+        #    t_pos = int(findDictKeyFromValue(idxB,leaderboardDict))
+        #    allDrivers[idxB].currentPos = t_pos
+        #else: #If none of the above...
+         #   #t_pos = allDrivers[t_driver_ahead].currentPos+1
+         #   t_pos = int(findDictKeyFromValue(idxB,leaderboardDict))
+        #    allDrivers[idxB].currentPos = t_pos
              
         ########################################################
 
@@ -424,7 +477,7 @@ def acUpdate(deltaT):
             allDrivers[idxB].lastPitTime = allDrivers[idxB].pitTimer #...update lastPitTime
         if allDrivers[idxB].inPitLane: #If inPitLane is true...
             allDrivers[idxB].pitTimer = time.time() - allDrivers[idxB].pitTimerStart #...update pitTimer
-            ac.log("{} - Pit Timer : {}".format(idxB,allDrivers[idxB].pitTimer))
+            #ac.log("{} - Pit Timer : {}".format(idxB,allDrivers[idxB].pitTimer))
             if ac.getCarState(idxB,acsys.CS.SpeedMS)<1 and not allDrivers[idxB].inPitBox:#...if speed is < 1 mps...
                 allDrivers[idxB].inPitBox = True #...assume car is in pitBox
                 allDrivers[idxB].inPitBoxTimerStart = time.time()  # ...set inPitBoxTimerStart
@@ -455,7 +508,10 @@ def acUpdate(deltaT):
         t_pitstopLbl = t_label.inPit
         #animate on position change
         if t_pos != allDrivers[idxB].currentPos: #If position changed.
-            allDrivers[idxB].currentPos = t_pos
+            #ac.log("ANIMATING at {}".format(time.time()))
+            #ac.log("Who: {} | Prev: {} | Curr: {}".format(idxB,allDrivers[idxB].currentPos,t_pos))
+            allDrivers[idxB].currentPos = int(findDictKeyFromValue(idxB,leaderboardDict))
+            #ac.log("Prev: {} | Curr: {}".format(allDrivers[idxB].previousPos, t_pos))
             t_label.destinationPosition = [positionLbl_left,t_pos_y]
             t_label.animate = True
         if t_label.animate:
@@ -521,7 +577,7 @@ def acUpdate(deltaT):
             ac.setVisible(t_stintLbl_bg, 1)
             ac.setVisible(t_stintLbl_txt,1)
             ac.setPosition(t_stintLbl_txt,raceOptionLbl_left,t_Lbl_y)
-            ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width, t_Lbl_y+3)
+            ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width, t_Lbl_y+5)
             #ac.setText(t_stintLbl,"test")
             if currentUpdateTime >= nextUpdate:
                 t_currentTyre = allDrivers[idxB].currentTyre
@@ -555,7 +611,7 @@ def acUpdate(deltaT):
             ac.setVisible(t_pitstopLbl,0)
 
 
-    if currentUpdateTime >= nextUpdate:        
+    if currentUpdateTime >= nextUpdate:
         nextUpdate = time.time() + refreshRate
 
 ##############################
@@ -726,8 +782,19 @@ def getLongestGame(carCount):
             t_lenght = len(getLastName(ac.getDriverName(i)))
             if t_lenght > t_longestName:
                 t_longestName = t_lenght
-        ac.log("Longest Name : {}".format(t_longestName))
+        #ac.log("Longest Name : {}".format(t_longestName))
         return t_longestName
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ getLongestGame()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+def sortByDistance(elem):
+    return elem[1]
+def findDictKeyFromValue(value,dict):
+    try:
+        for a in dict:
+            if dict[a] == value:
+                return a
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ getLongestGame()")
