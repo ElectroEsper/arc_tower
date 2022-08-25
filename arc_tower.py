@@ -49,7 +49,9 @@ mainWindow = 0
 
 class Label:
     def __init__(self,window):
-        
+        #synced driver
+        self.parentCar = -1
+
         #Animation related
         self.animate = False
         self.originalPosition = [0,0]
@@ -88,6 +90,20 @@ class Label:
         self.inPit = ac.addLabel(window,"")
         ac.setFontSize(self.inPit,fontSize)
         ac.setFontAlignment(self.inPit,"left")
+
+        #Clickidy function
+        self.button = ac.addButton(window,"")
+        ac.addOnClickedListener(self.button,self.onClickFocusCar)
+
+    def onClickFocusCar():
+        try:
+            ac.focusCar(self.parentCar)
+            ac.log("CLICK")
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            ac.log("Error @ Label.onClickFocusCar()")
+            ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+
 
 class Driver:
     def __init__(self,id):
@@ -147,6 +163,38 @@ class Driver:
         #Total distance traveled
         self.distanceTraveled = 0
 
+class ModeButton:
+    def __init__(self,mainWindow_ref):
+        self.mainWindow_ref = mainWindow_ref
+        self.mainWindow_ref_size_x = ac.getSize(mainWindow_ref)[0]
+        self.window = ac.newApp(appName)
+        self.Button = ac.addButton(self.window, "BUTTON")
+        ac.setSize(self.Button,100,20)
+        ac.addOnClickedListener(self.Button, buttonTester)
+    def updateView(self):
+        self.mainWindow_ref_pos = ac.getPosition(self.mainWindow_ref)
+        ac.log("WindowPos:{}".format(self.mainWindow_ref_pos))
+        try:
+            ac.setPosition(self.Button,ac.getPosition(self.mainWindow_ref_pos)[0]+positionLbl_left+nameLbl_width,ac.getPosition(self.mainWindow_ref_pos)[1]+modeLbl_y_pos)
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            ac.log("Error @ ModeButton.updateView()")
+            ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+    def updatePos(self):
+        self.mainWindow_ref_pos = ac.getPosition(self.mainWindow_ref)
+        self.pos_ref_x = self.mainWindow_ref_pos[0]
+        self.pos_ref_y = self.mainWindow_ref_pos[1]
+        #ac.setPosition(self.Button, self.pos_ref_x + positionLbl_left + nameLbl_width,self.pos_ref_y + modeLbl_y_pos)
+        ac.setPosition(self.Button, self.pos_ref_x-self.mainWindow_ref_size_x, self.pos_ref_y)
+    def onRenderCallBack(self, deltaT):
+        try:
+            self.mainWindow_ref_pos = ac.getPosition(self.mainWindow_ref)
+            ac.log("WindowPos:{}".format(self.mainWindow_ref_pos))
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            ac.log("Error @ ModeButton.onRenderCallBack()")
+            ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+
 # --- TOWER VAR ---
 allDrivers = {}
 allLabels = {}
@@ -164,6 +212,9 @@ fontSize = 20
 animateSpeed = 2
 longestName = 0
 
+# -- Mode Button ---
+modeButton = 0
+
 # -- GATES ---
 gate_0 = 0
 gate_1 = 0
@@ -178,6 +229,8 @@ sector_1 = 0
 sector_2 = 0
 
 # -- Tyre Compound -- #
+bgpath_tyre_us = None
+bgpath_tyre_ss = None
 bgpath_tyre_s = None
 bgpath_tyre_m = None
 bgpath_tyre_h = None
@@ -212,7 +265,7 @@ pitstop_width = fontSize
 sizeMult = 1
 
 def acMain(ac_versions):
-    global mainWindow, sessionLbl_name, sessionLbl_time
+    global mainWindow, sessionLbl_name, sessionLbl_time, modeLbl, modeButton
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h
@@ -224,24 +277,36 @@ def acMain(ac_versions):
     ac.setSize(mainWindow, main_size_x,main_size_y)
     ac.setIconPosition(mainWindow,-10000,-10000)
     ac.setTitlePosition(mainWindow,-10000,-10000)
+
+    #if modeButton == 0 :
+    #    modeButton = ModeButton(mainWindow)
+
     #Session Time
     sessionLbl_time = ac.addLabel(mainWindow,"SESSION")
     ac.setSize(sessionLbl_time,nameLbl_left+nameLbl_width,sessionLbl_width)
-    ac.setPosition(sessionLbl_time,-10,0)
+    ac.setPosition(sessionLbl_time,positionLbl_left+nameLbl_width,0)
     ac.setFontSize(sessionLbl_time,fontSize*2)
-    ac.setFontAlignment(sessionLbl_time,"center")
+    #ac.setFontAlignment(sessionLbl_time,"center")
     #Session name
     sessionLbl_name = ac.addLabel(mainWindow,"TEST")
-    ac.setSize(sessionLbl_name,sessionLbl_name+nameLbl_width,sessionLbl_width)
-    ac.setPosition(sessionLbl_name,0,-50)
-    ac.setFontSize(sessionLbl_name,fontSize*2)
-    ac.setFontAlignment(sessionLbl_name,"left")
+    ac.setSize(sessionLbl_name,100,sessionLbl_width)
+    #ac.setPosition(sessionLbl_name,0, -50)
+    ac.setFontSize(sessionLbl_name, fontSize*2)
+    #ac.setFontAlignment(sessionLbl_name,"center")
     #Mode
+    ## Button
+    modeButton = ac.addButton(mainWindow, "BUTTON")
+    ac.setSize(modeButton,longestName,20)
+    ac.setPosition(modeButton,nameLbl_left,modeLbl_y_pos)
+    ac.addOnClickedListener(modeButton, buttonSwitchMode)
+    ## TEXT
     #modeLbl = ac.addLabel(mainWindow,"")
     #ac.setSize(modeLbl,nameLbl_width,5)
-    #ac.setPosition(modeLbl,0,modeLbl_y_pos)
+    #ac.setPosition(modeLbl,positionLbl_left+nameLbl_width,modeLbl_y_pos)
+    #ac.setPosition(modeLbl, -500,-500)
     #ac.setFontSize(modeLbl,fontSize*1)
     #ac.setFontAlignment(modeLbl,"center")
+
 
     #################################################
     # -- GET TRACK SETTINGS -- #
@@ -283,7 +348,7 @@ def acMain(ac_versions):
 
     return appName    
 def acUpdate(deltaT):
-    global mainWindow, sessionLbl_name, sessionLbl_time
+    global mainWindow, sessionLbl_name, sessionLbl_time, modeButton
     global positionLbl_left, nameLbl_left, nameLbl_width, raceOptionLbl_left
     global currentSession, currentSessionStrg, trackLength
     global raceOptionnalEnum
@@ -292,14 +357,26 @@ def acUpdate(deltaT):
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
     global longestName, allDrivers, allLabels
+    global leaderboard, leaderboardDict, modeLbl
 
     currentUpdateTime = time.time()
 
+    ac.setSize(modeButton, nameLbl_width, 20)
+    ac.setSize(sessionLbl_time, (nameLbl_left + nameLbl_width), sessionLbl_width)
+    ac.setPosition(sessionLbl_time, 0, -10)
+    ac.setFontAlignment(sessionLbl_time, "center")
+    ac.setSize(sessionLbl_name, (raceOptionLbl_left), sessionLbl_width)
+    ac.setPosition(sessionLbl_name, 0, -50)
+    ac.setFontAlignment(sessionLbl_name, "center")
+    #modeButton.updatePos()
+    #ac.log("MainWindowPos : {}".format(ac.getPosition(mainWindow)[1]))
     #Check if session changed...
     if currentSession != info.graphics.session:
         currentSession = info.graphics.session
         allDrivers = {}
-        allLabels = {}
+        #allLabels = {}
+        leaderboard = []
+        leaderboardDict = {}
 
     currentSession = info.graphics.session
     
@@ -320,9 +397,7 @@ def acUpdate(deltaT):
     #ac.setFontAlignment(sessionLbl_time,"left")
     
     if info.graphics.numberOfLaps == 0:
-        #ac.setText(sessionLbl_name,currentSessionStrg)
         ac.setText(sessionLbl_time,"{}{:02}".format(convertMillisToMinutesSeconds(info.graphics.sessionTimeLeft/1000)[0],convertMillisToMinutesSeconds(info.graphics.sessionTimeLeft/1000)[1]))
-        #ac.setText(sessionLbl,"{} - {}".format(currentSessionStrg,info.graphics.sessionTimeLeft))
     else:
         ac.setText(sessionLbl_time,"{}/{}".format(ac.getCarState(findLeader(),acsys.CS.LapCount)+1,info.graphics.numberOfLaps))
     #sessionTimeLeft
@@ -335,18 +410,16 @@ def acUpdate(deltaT):
         if ac.getDriverName(idx) in listOfActorToHide:
             continue
         if not idx in allDrivers.keys():
-            if False:
-                pass
-            else:
-                allDrivers.update({idx:Driver(idx)})
-                leaderboard.append([allDrivers[idx].id,allDrivers[idx].distanceTraveled])
+            allDrivers.update({idx:Driver(idx)})
+            leaderboard.append([allDrivers[idx].id,allDrivers[idx].distanceTraveled])
+            #ac.log("Lead.Append : {}".format(leaderboard))
         if not idx in allLabels.keys():
-            if False:
-                pass
-            else:
-                allLabels.update({idx:Label(mainWindow)})
-                allDrivers[idx].lblId = idx
-
+            allLabels.update({idx:Label(mainWindow)})
+            allLabels[idx].parentCar = idx
+            allDrivers[idx].lblId = idx
+        else:
+            allLabels[idx].parentCar = idx
+            allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
     longestName = getLongestGame(totalDrivers)
     nameLbl_width = (longestName*(fontSize*1))
@@ -369,14 +442,20 @@ def acUpdate(deltaT):
     for idxD in range(len(leaderboard)):
         leaderboard_pos_key = str(idxD+1)
         leaderboardDict[leaderboard_pos_key] = leaderboard[idxD][0]
+    #for idxE in allLabels:
+    #    ac.log("AllLabel : {}".format(idxE))
+    #for idxE in range(len(leaderboard)):
+    #    ac.log("Leaderboard : {}".format(leaderboardDict[str(idxE+1)]))
+    #for idxE in leaderboardDict:
+        #ac.log("Dict : {}".format(idxE))
     #ac.log("{}".format(leaderboard))
-    for each in range(len(leaderboard)):
-        ac.log("-------")
-        ac.log("A -Pos:{} - {}".format(each+1,leaderboard[each]))
-        ac.log("B -Lap:{} - Spline: {}".format(ac.getCarState(leaderboard[each][0],acsys.CS.LapCount),ac.getCarState(leaderboard[each][0],acsys.CS.NormalizedSplinePosition)))
-        ac.log("^^^^^^^")
-        ac.log("")
-        ac.log("")
+    #for each in range(len(leaderboard)):
+    #    ac.log("-------")
+    #    ac.log("A -Pos:{} - {}".format(each+1,leaderboard[each]))
+     #   ac.log("B -Lap:{} - Spline: {}".format(ac.getCarState(leaderboard[each][0],acsys.CS.LapCount),ac.getCarState(leaderboard[each][0],acsys.CS.NormalizedSplinePosition)))
+    #    ac.log("^^^^^^^")
+     #   ac.log("")
+    #    ac.log("")
 
     #ac.log("{}".format(nameLbl_width))
     #Update driver's data
@@ -501,6 +580,7 @@ def acUpdate(deltaT):
         #Get labels
         t_posLbl = t_label.posLbl
         t_nameLbl = t_label.nameLbl
+        t_Btn = t_label.button
         t_intervalLbl = t_label.intervalLbl
         t_gapToLeadLbl = t_label.gapToLeadLbl
         t_stintLbl_bg = t_label.stintLbl_bg
@@ -528,8 +608,12 @@ def acUpdate(deltaT):
         #ac.setSize(t_nameLbl,nameLbl_width-100,fontSize)
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
+        ac.setSize(t_Btn,raceOptionLbl_left+10 , fontSize)
+        ac.setPosition(t_Btn, nameLbl_left, t_Lbl_y+5)
 
+        #ac.setVisible(modeLbl,1)
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
+            ac.setText(modeButton, "INTERVAL")
             ac.setVisible(t_intervalLbl,1)
             t_carChaserCurrentLap = ac.getCarState(idxB,acsys.CS.LapCount)
             ac.setPosition(t_intervalLbl,raceOptionLbl_left,t_Lbl_y)
@@ -545,13 +629,13 @@ def acUpdate(deltaT):
                     #intervalToLabel(t_intervalLbl,t_carAhead,ac.getCarState(t_carAhead,acsys.CS.NormalizedSplinePosition),idxB,ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition),(ac.getCarState(idxB,acsys.CS.SpeedMS)+ac.getCarState(t_carAhead,acsys.CS.SpeedMS))/2)
                     intervalToLabel_gate(t_intervalLbl, idxB, t_carAhead)
                 else:
-                    ac.setText(t_intervalLbl,"INTERVAL")
+                    ac.setText(t_intervalLbl,"-")
                 ac.setFontAlignment(t_intervalLbl,"right")
         else:
             ac.setVisible(t_intervalLbl,0)
         if raceOptionnalEnum == 1: #If raceoptionna is gap to leader
             ac.setVisible(t_gapToLeadLbl,1)
-            #ac.setText(modeLbl,"INTERVAL")
+            ac.setText(modeButton,"TO LEADER")
             t_carChaserCurrentLap = ac.getCarState(idxB,acsys.CS.LapCount)
             ac.setPosition(t_gapToLeadLbl,raceOptionLbl_left,t_Lbl_y)
             if currentUpdateTime >= nextUpdate:
@@ -569,28 +653,36 @@ def acUpdate(deltaT):
                     else:
                         intervalToLabel_gate(t_gapToLeadLbl,idxB,t_carAhead)
                 else:
-                    ac.setText(t_gapToLeadLbl,"LEADER")
+                    ac.setText(t_gapToLeadLbl,"-")
                 ac.setFontAlignment(t_gapToLeadLbl,"right")
         else:
             ac.setVisible(t_gapToLeadLbl, 0)
         if raceOptionnalEnum == 2:
+            ac.setText(modeButton, "TYRE")
             ac.setVisible(t_stintLbl_bg, 1)
             ac.setVisible(t_stintLbl_txt,1)
-            ac.setPosition(t_stintLbl_txt,raceOptionLbl_left,t_Lbl_y)
-            ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width, t_Lbl_y+5)
+            ac.setPosition(t_stintLbl_txt,raceOptionLbl_left + tyreCompound_width/4,t_Lbl_y)
+            ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width/1.5, t_Lbl_y+5)
+            #ac.setPosition(t_stintLbl_bg, raceOptionLbl_left, t_Lbl_y + 5)
             #ac.setText(t_stintLbl,"test")
             if currentUpdateTime >= nextUpdate:
                 t_currentTyre = allDrivers[idxB].currentTyre
                 ac.setText(t_stintLbl_txt, "{} Laps".format(allDrivers[idxB].currentStintLenght))
                 #ac.log("{}".format(t_currentTyre))
                 t_currentStingLenght = allDrivers[idxB].currentStintLenght
-                if t_currentTyre == "S":
+                if t_currentTyre == "C5":
+                    ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_us)
+                    ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
+                elif t_currentTyre == "C4":
+                    ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_ss)
+                    ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
+                elif t_currentTyre == "C3":
                     ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_s)
                     ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
-                elif t_currentTyre == "M":
+                elif t_currentTyre == "C2":
                     ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_m)
                     ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
-                elif t_currentTyre == "H":
+                elif t_currentTyre == "C1":
                     ac.setBackgroundTexture(t_stintLbl_bg, img_tyre_h)
                     ac.setSize(t_stintLbl_bg, tyre_icon_x * (fontSize / tyre_icon_x), tyre_icon_y * (fontSize / tyre_icon_y))
                 else:
@@ -798,4 +890,25 @@ def findDictKeyFromValue(value,dict):
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ getLongestGame()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+def buttonTester(*args):
+    #if ac.getText(button) != "CLICK":
+    #    ac.setText(button,"CLICK")
+    #else:
+    #    ac.setText(button, "NO-CLICK")
+    ac.log("CLICK")
+def buttonSwitchMode(*args):
+    global raceOptionnalEnum
+    try:
+        raceOptionnalEnum_ref = raceOptionnalEnum
+        if raceOptionnalEnum_ref == 0:
+            raceOptionnalEnum_ref = 1
+        elif raceOptionnalEnum_ref == 1:
+            raceOptionnalEnum_ref = 2
+        else:
+            raceOptionnalEnum_ref = 0
+        raceOptionnalEnum = raceOptionnalEnum_ref
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ buttonSwitchMode()")
         ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
