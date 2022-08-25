@@ -7,6 +7,7 @@ import json
 
 import math
 import time
+import functools
 import timeit
 import statistics
 
@@ -48,9 +49,9 @@ mainWindow = 0
 
 
 class Label:
-    def __init__(self,window):
+    def __init__(self,window,carId):
         #synced driver
-        self.parentCar = -1
+        self.parentCar = carId
 
         #Animation related
         self.animate = False
@@ -93,16 +94,16 @@ class Label:
 
         #Clickidy function
         self.button = ac.addButton(window,"")
-        ac.addOnClickedListener(self.button,self.onClickFocusCar)
+        #ac.setVisible(self.button,1)
+        ac.setBackgroundOpacity(self.button,0)
+        ac.drawBorder(self.button,0)
+        #ac.addOnClickedListener(self.button,onClickFocusCar)
+        self.partial_func = functools.partial(self.clickedOn, driver=self.parentCar)
+        ac.addOnClickedListener(self.button, self.partial_func)
+    def clickedOn(*args, driver=0):
+        ac.focusCar(driver)
+        ac.log("CLICK : {}".format(driver))
 
-    def onClickFocusCar():
-        try:
-            ac.focusCar(self.parentCar)
-            ac.log("CLICK")
-        except:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            ac.log("Error @ Label.onClickFocusCar()")
-            ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
 
 
 class Driver:
@@ -414,11 +415,13 @@ def acUpdate(deltaT):
             leaderboard.append([allDrivers[idx].id,allDrivers[idx].distanceTraveled])
             #ac.log("Lead.Append : {}".format(leaderboard))
         if not idx in allLabels.keys():
-            allLabels.update({idx:Label(mainWindow)})
+            allLabels.update({idx:Label(mainWindow,idx)})
             allLabels[idx].parentCar = idx
+            ac.log("{}".format(allLabels[idx].parentCar))
             allDrivers[idx].lblId = idx
         else:
             allLabels[idx].parentCar = idx
+            #ac.log("{}".format(allLabels[idx].parentCar))
             allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
     longestName = getLongestGame(totalDrivers)
@@ -608,8 +611,8 @@ def acUpdate(deltaT):
         #ac.setSize(t_nameLbl,nameLbl_width-100,fontSize)
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
-        ac.setSize(t_Btn,raceOptionLbl_left+10 , fontSize)
-        ac.setPosition(t_Btn, nameLbl_left, t_Lbl_y+5)
+        ac.setSize(t_Btn,raceOptionLbl_left+fontSize , fontSize)
+        ac.setPosition(t_Btn, positionLbl_left-fontSize, t_Lbl_y+5)
 
         #ac.setVisible(modeLbl,1)
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
@@ -911,4 +914,13 @@ def buttonSwitchMode(*args):
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ buttonSwitchMode()")
+        ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+def onClickFocusCar(*args):
+    try:
+        #ac.focusCar(self.parentCar)
+        ac.log("CLICK")
+        #ac.log("{}".format(parentCar))
+    except:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        ac.log("Error @ onClickFocusCar()")
         ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
