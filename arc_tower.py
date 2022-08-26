@@ -59,15 +59,20 @@ class Label:
         self.destinationPosition = [0,0]
         
         #Pos
-        self.posLbl = ac.addLabel(window,"")
+
+        self.posBg = ac.addLabel(window, "")
+        self.posLbl = ac.addLabel(window, "")
         ac.setFontSize(self.posLbl,fontSize)
         #Badge
         
         #Name
+        self.nameBg = ac.addLabel(window, "")
         self.nameLbl = ac.addLabel(window,"")
         ac.setFontSize(self.nameLbl,fontSize)
         
         #Race optionnals
+        ##BG
+        self.optBg = ac.addLabel(window, "")
         ##Interval
         self.intervalLbl = ac.addLabel(window,"")
         ac.setFontSize(self.intervalLbl,fontSize)
@@ -100,6 +105,7 @@ class Label:
         #ac.addOnClickedListener(self.button,onClickFocusCar)
         self.partial_func = functools.partial(self.clickedOn, driver=self.parentCar)
         ac.addOnClickedListener(self.button, self.partial_func)
+
     def clickedOn(*args, driver=0):
         ac.focusCar(driver)
         ac.log("CLICK : {}".format(driver))
@@ -209,7 +215,7 @@ refreshRate = 0.1
 leaderboard = []
 leaderboardDict = {}
 # -- LABEL VAR ---
-fontSize = 20
+fontSize = 25
 animateSpeed = 2
 longestName = 0
 
@@ -270,6 +276,7 @@ def acMain(ac_versions):
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h
+    global img_bg_vert, img_bg_vert_66p
 
     main_size_x = 250
     main_size_y = 1000
@@ -278,6 +285,8 @@ def acMain(ac_versions):
     ac.setSize(mainWindow, main_size_x,main_size_y)
     ac.setIconPosition(mainWindow,-10000,-10000)
     ac.setTitlePosition(mainWindow,-10000,-10000)
+    ac.setBackgroundOpacity(mainWindow,0)
+    ac.drawBorder(mainWindow,0)
 
     #if modeButton == 0 :
     #    modeButton = ModeButton(mainWindow)
@@ -288,26 +297,20 @@ def acMain(ac_versions):
     ac.setPosition(sessionLbl_time,positionLbl_left+nameLbl_width,0)
     ac.setFontSize(sessionLbl_time,fontSize*2)
     #ac.setFontAlignment(sessionLbl_time,"center")
+
     #Session name
     sessionLbl_name = ac.addLabel(mainWindow,"TEST")
     ac.setSize(sessionLbl_name,100,sessionLbl_width)
     #ac.setPosition(sessionLbl_name,0, -50)
     ac.setFontSize(sessionLbl_name, fontSize*2)
     #ac.setFontAlignment(sessionLbl_name,"center")
+
     #Mode
     ## Button
     modeButton = ac.addButton(mainWindow, "BUTTON")
     ac.setSize(modeButton,longestName,20)
     ac.setPosition(modeButton,nameLbl_left,modeLbl_y_pos)
     ac.addOnClickedListener(modeButton, buttonSwitchMode)
-    ## TEXT
-    #modeLbl = ac.addLabel(mainWindow,"")
-    #ac.setSize(modeLbl,nameLbl_width,5)
-    #ac.setPosition(modeLbl,positionLbl_left+nameLbl_width,modeLbl_y_pos)
-    #ac.setPosition(modeLbl, -500,-500)
-    #ac.setFontSize(modeLbl,fontSize*1)
-    #ac.setFontAlignment(modeLbl,"center")
-
 
     #################################################
     # -- GET TRACK SETTINGS -- #
@@ -343,6 +346,11 @@ def acMain(ac_versions):
     #################################################
 
     # HANDLE Sprites #
+    #Misc
+    img_bg_vert = os.path.dirname(__file__) + '/img/bg_vert.png'
+    img_bg_vert_66p = os.path.dirname(__file__) + '/img/bg_vert_66p.png'
+
+    #Tyre
     img_tyre_s = os.path.dirname(__file__) + '/img/bg_tyre_soft.png'
     img_tyre_m = os.path.dirname(__file__) + '/img/bg_tyre_medium.png'
     img_tyre_h = os.path.dirname(__file__) + '/img/bg_tyre_hard.png'
@@ -359,7 +367,10 @@ def acUpdate(deltaT):
     global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
     global longestName, allDrivers, allLabels
     global leaderboard, leaderboardDict, modeLbl
+    global img_bg_vert, img_bg_vert_66p
 
+    ac.setBackgroundOpacity(mainWindow, 0)
+    ac.drawBorder(mainWindow, 0)
     currentUpdateTime = time.time()
 
     ac.setSize(modeButton, nameLbl_width, 20)
@@ -424,7 +435,7 @@ def acUpdate(deltaT):
             #ac.log("{}".format(allLabels[idx].parentCar))
             allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
-    longestName = getLongestGame(totalDrivers)
+    longestName = getLongestGame(totalDrivers)-1
     nameLbl_width = (longestName*(fontSize*1))
     raceOptionLbl_left = nameLbl_left + nameLbl_width
 
@@ -582,8 +593,11 @@ def acUpdate(deltaT):
        
         #Get labels
         t_posLbl = t_label.posLbl
+        t_posBg = t_label.posBg
         t_nameLbl = t_label.nameLbl
+        t_nameBg = t_label.nameBg
         t_Btn = t_label.button
+        t_optBg = t_label.optBg
         t_intervalLbl = t_label.intervalLbl
         t_gapToLeadLbl = t_label.gapToLeadLbl
         t_stintLbl_bg = t_label.stintLbl_bg
@@ -605,17 +619,36 @@ def acUpdate(deltaT):
         t_Lbl_y = ac.getPosition(t_posLbl)[1]
         ac.setText(t_posLbl,"{}".format(t_pos))
         ac.setFontAlignment(t_posLbl,"right")
+
+        #POSITION.BACKGROUND
+        ac.setSize(t_posBg,fontSize+4,fontSize+2)
+        ac.setPosition(t_posBg,positionLbl_left-fontSize-2,t_Lbl_y+4)
+        ac.setBackgroundTexture(t_posBg,img_bg_vert)
         
         #Set name
         ac.setPosition(t_nameLbl,nameLbl_left,t_Lbl_y)
         #ac.setSize(t_nameLbl,nameLbl_width-100,fontSize)
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
-        ac.setSize(t_Btn,raceOptionLbl_left+fontSize , fontSize)
-        ac.setPosition(t_Btn, positionLbl_left-fontSize, t_Lbl_y+5)
+        #NAME.BACKGROUND
+        ac.setSize(t_nameBg, nameLbl_width-(fontSize*2.5), fontSize+2)
+        ac.setPosition(t_nameBg, nameLbl_left-2, t_Lbl_y + 4)
+        ac.setBackgroundTexture(t_nameBg, img_bg_vert)
+
+        #OPTIONAL.BACKGROUND
+        ac.setBackgroundTexture(t_optBg, img_bg_vert_66p)
+        ac.setSize(t_optBg, tyreCompound_width - 20, fontSize+2)
+        ac.setPosition(t_optBg, raceOptionLbl_left- 67, t_Lbl_y+4)
+        ac.setBackgroundOpacity(t_optBg,0.66)
+        #MODE.BUTTON
+        ac.setSize(t_Btn, raceOptionLbl_left + fontSize, fontSize)
+        ac.setPosition(t_Btn, positionLbl_left - fontSize, t_Lbl_y)
 
         #ac.setVisible(modeLbl,1)
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
+            #BACKGROUND
+
+            ####
             ac.setText(modeButton, "INTERVAL")
             ac.setVisible(t_intervalLbl,1)
             t_carChaserCurrentLap = ac.getCarState(idxB,acsys.CS.LapCount)
@@ -664,13 +697,13 @@ def acUpdate(deltaT):
             ac.setText(modeButton, "TYRE")
             ac.setVisible(t_stintLbl_bg, 1)
             ac.setVisible(t_stintLbl_txt,1)
-            ac.setPosition(t_stintLbl_txt,raceOptionLbl_left + tyreCompound_width/4,t_Lbl_y)
+            ac.setPosition(t_stintLbl_txt,raceOptionLbl_left,t_Lbl_y)
             ac.setPosition(t_stintLbl_bg, raceOptionLbl_left - tyreCompound_width/1.5, t_Lbl_y+5)
             #ac.setPosition(t_stintLbl_bg, raceOptionLbl_left, t_Lbl_y + 5)
             #ac.setText(t_stintLbl,"test")
             if currentUpdateTime >= nextUpdate:
                 t_currentTyre = allDrivers[idxB].currentTyre
-                ac.setText(t_stintLbl_txt, "{} Laps".format(allDrivers[idxB].currentStintLenght))
+                ac.setText(t_stintLbl_txt, "1{} L".format(allDrivers[idxB].currentStintLenght))
                 #ac.log("{}".format(t_currentTyre))
                 t_currentStingLenght = allDrivers[idxB].currentStintLenght
                 if t_currentTyre == "C5":
