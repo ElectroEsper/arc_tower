@@ -219,6 +219,7 @@ currentUpdateTime = 0
 refreshRate = 0.1
 leaderboard = []
 leaderboardDict = {}
+session_purple_lap = 99999999999
 # -- LABEL VAR ---
 fontSize = 25
 animateSpeed = 2
@@ -272,7 +273,7 @@ tyreCompound_width = tyreCompound_widthConstant
 
 #Race optionnal
 raceOptionLbl_left = tyreCompound_left + tyreCompound_width
-raceOptionLbl_width = 200
+raceOptionLbl_width = fontSize*3
 
 
 #Pitstop
@@ -286,7 +287,23 @@ def acMain(ac_versions):
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h
-    global img_bg_vert, img_bg_vert_66p
+    global img_bg_vert, img_bg_vert_66p, img_bg_fastest_lap
+    global bg_tower_top
+
+    # HANDLE Sprites #
+    #Misc
+    img_bg_vert = os.path.dirname(__file__) + '/img/bg_vert.png'
+    img_bg_vert_66p = os.path.dirname(__file__) + '/img/bg_vert_66p.png'
+    img_bg_fastest_lap = os.path.dirname(__file__) + '/img/bg_fastest_lap.png'
+
+    #Tower
+    img_bg_tower_top = os.path.dirname(__file__) + '/img/bg_tower_top.png'
+
+    #Tyre
+    img_tyre_s = os.path.dirname(__file__) + '/img/bg_tyre_soft.png'
+    img_tyre_m = os.path.dirname(__file__) + '/img/bg_tyre_medium.png'
+    img_tyre_h = os.path.dirname(__file__) + '/img/bg_tyre_hard.png'
+
 
     main_size_x = 250
     main_size_y = 1000
@@ -301,10 +318,16 @@ def acMain(ac_versions):
     #if modeButton == 0 :
     #    modeButton = ModeButton(mainWindow)
 
+    #Tower Top
+    bg_tower_top = ac.addLabel(mainWindow, "")
+    ac.setBackgroundTexture(bg_tower_top, img_bg_tower_top)
+    ac.setPosition(bg_tower_top, positionLbl_left - (fontSize * 1.1), -125)
+
+
     #Session Time
     sessionLbl_time = ac.addLabel(mainWindow,"SESSION")
     ac.setSize(sessionLbl_time,nameLbl_left+nameLbl_width,sessionLbl_width)
-    ac.setPosition(sessionLbl_time,positionLbl_left+nameLbl_width,0)
+    ac.setPosition(sessionLbl_time,(positionLbl_width + nameLbl_width + fontSize)/2,0)
     ac.setFontSize(sessionLbl_time,fontSize*2)
     #ac.setFontAlignment(sessionLbl_time,"center")
 
@@ -355,42 +378,38 @@ def acMain(ac_versions):
     ac.log("Gate(7-8):{}".format(gate_7, gate_8))
     #################################################
 
-    # HANDLE Sprites #
-    #Misc
-    img_bg_vert = os.path.dirname(__file__) + '/img/bg_vert.png'
-    img_bg_vert_66p = os.path.dirname(__file__) + '/img/bg_vert_66p.png'
 
-    #Tyre
-    img_tyre_s = os.path.dirname(__file__) + '/img/bg_tyre_soft.png'
-    img_tyre_m = os.path.dirname(__file__) + '/img/bg_tyre_medium.png'
-    img_tyre_h = os.path.dirname(__file__) + '/img/bg_tyre_hard.png'
+
 
     return appName    
 def acUpdate(deltaT):
     global mainWindow, sessionLbl_name, sessionLbl_time, modeButton
     global positionLbl_left, nameLbl_left, nameLbl_width, raceOptionLbl_left, tyreCompound_left, raceOptionLbl_width
     global currentSession, currentSessionStrg, trackLength
-    global raceOptionnalEnum
+    global raceOptionnalEnum, session_purple_lap
     global nextUpdate, refreshRate, currentUpdateTime
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
     global longestName, allDrivers, allLabels
     global leaderboard, leaderboardDict, modeLbl
-    global img_bg_vert, img_bg_vert_66p , tyreCompound_width, tyreCompound_widthConstant
+    global img_bg_fastest_lap, img_bg_vert, img_bg_vert_66p , tyreCompound_width, tyreCompound_widthConstant
+    global bg_tower_top
 
-
+    ac.setSize(bg_tower_top, positionLbl_width + nameLbl_width + fontSize, (positionLbl_width + nameLbl_width + fontSize)*0.7)
+    ac.setPosition(bg_tower_top, positionLbl_left - (fontSize * 1.1), -75)
 
     ac.setBackgroundOpacity(mainWindow, 0)
     ac.drawBorder(mainWindow, 0)
     currentUpdateTime = time.time()
 
-    ac.setSize(modeButton, nameLbl_width, 20)
+    ac.setSize(modeButton, nameLbl_width+(fontSize*1.09), 20)
     ac.setSize(sessionLbl_time, (nameLbl_left + nameLbl_width), sessionLbl_width)
-    ac.setPosition(sessionLbl_time, 0, -10)
+    ac.setPosition(modeButton,nameLbl_left-(fontSize*1.3),49)
+    ac.setPosition(sessionLbl_time, positionLbl_left-(fontSize*0.75), -15)
     ac.setFontAlignment(sessionLbl_time, "center")
     ac.setSize(sessionLbl_name, (raceOptionLbl_left), sessionLbl_width)
-    ac.setPosition(sessionLbl_name, 0, -50)
+    ac.setPosition(sessionLbl_name, positionLbl_left-(fontSize*0.75)-(tyreCompound_width/2), -60)
     ac.setFontAlignment(sessionLbl_name, "center")
     #modeButton.updatePos()
     #ac.log("MainWindowPos : {}".format(ac.getPosition(mainWindow)[1]))
@@ -448,7 +467,7 @@ def acUpdate(deltaT):
             allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
     longestName = getLongestGame(totalDrivers)-1
-    nameLbl_width = (longestName*(fontSize*1))
+    nameLbl_width = (longestName*(fontSize*1))-(fontSize*2)
     raceOptionLbl_left = tyreCompound_left + (tyreCompound_width*1)
 
     #Update leaderboard
@@ -477,12 +496,21 @@ def acUpdate(deltaT):
             continue #Go to next driver...
 
         ############## Update gates ##############
-
         t_currentSplinePos = ac.getCarState(idxB,acsys.CS.NormalizedSplinePosition)
         t_currentGate = allDrivers[idxB].gate_current
         t_currentLap = ac.getCarState(idxB,acsys.CS.LapCount)
         if t_currentSplinePos >= 0 and t_currentSplinePos < gate_1: #If is past Start/Finish but not gate 1...
             if t_currentGate != 0: #If self.currentGate is has not been updated...
+                if allDrivers[idxB].gate_0[0] == 0:
+                    ac.log("Just reset")
+                else:
+                    allDrivers[idxB].LastLap = time.time() - allDrivers[idxB].gate_0[0]
+                    ac.log("{}".format(allDrivers[idxB].LastLap))
+                    # Check if is purple
+                    if allDrivers[idxB].LastLap < session_purple_lap:
+                        session_purple_lap = allDrivers[idxB].LastLap
+                        allDrivers[idxB].pb_lap = allDrivers[idxB].LastLap
+                        ac.log("NEW PURPLE! {}-{}".format(session_purple_lap,allDrivers[idxB].LastLap))
                 allDrivers[idxB].gate_current = 0
                 allDrivers[idxB].gate_0 = [time.time(),t_currentLap]
 
@@ -519,6 +547,7 @@ def acUpdate(deltaT):
                 allDrivers[idxB].gate_current = 8
                 allDrivers[idxB].gate_8 = [time.time(), t_currentLap]
                 allDrivers[idxB].CompletedLap = t_currentLap
+
 
 
         ########################################################
@@ -594,6 +623,10 @@ def acUpdate(deltaT):
         t_tyreBg = t_label.tyreBg
         t_tyreIcon = t_label.tyreIcon
         t_pitstopLbl = t_label.inPit
+
+        #Get data
+        t_personal_purple = allDrivers[idxB].pb_lap
+
         #animate on position change
         if t_pos != allDrivers[idxB].currentPos: #If position changed.
             #ac.log("ANIMATING at {}".format(time.time()))
@@ -614,32 +647,37 @@ def acUpdate(deltaT):
         #POSITION.BACKGROUND
         ac.setSize(t_posBg,fontSize+4,fontSize+2)
         ac.setPosition(t_posBg,positionLbl_left-fontSize-2,t_Lbl_y+4)
-        ac.setBackgroundTexture(t_posBg,img_bg_vert)
-        
+        ac.setBackgroundTexture(t_posBg, img_bg_vert)
         #Set name
         ac.setPosition(t_nameLbl,nameLbl_left,t_Lbl_y)
         ac.setText(t_nameLbl,"{}".format(getLastName(ac.getDriverName(idxB))))
         ac.setFontAlignment(t_nameLbl,"left")
         #NAME.BACKGROUND
-        ac.setSize(t_nameBg, nameLbl_width-(fontSize*2), fontSize+2)
+        ac.setSize(t_nameBg, nameLbl_width, fontSize+2)
         ac.setPosition(t_nameBg, nameLbl_left-2, t_Lbl_y + 4)
-        ac.setBackgroundTexture(t_nameBg, img_bg_vert)
+        if t_personal_purple == session_purple_lap:
+            #ac.log("Set background for purple")
+            ac.setBackgroundTexture(t_nameBg, img_bg_fastest_lap)
+        else:
+            ac.setBackgroundTexture(t_nameBg, img_bg_vert)
 
         #OPTIONAL.BACKGROUND
         ac.setBackgroundTexture(t_optBg, img_bg_vert_66p)
-        ac.setSize(t_optBg, raceOptionLbl_width, fontSize+2)
-        ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y+4)
+        #ac.setSize(t_optBg, raceOptionLbl_width, fontSize+2)
+        #ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y+4)
         ac.setBackgroundOpacity(t_optBg,0.66)
 
 
-        #MODE.BUTTON
+        #INVISIBLE BUTTON TO SELECT CARS
         ac.setSize(t_Btn, raceOptionLbl_left + fontSize, fontSize)
         ac.setPosition(t_Btn, positionLbl_left - fontSize, t_Lbl_y)
 
         #ac.setVisible(modeLbl,1)
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
             #BACKGROUND
-
+            tyreCompound_left = nameLbl_left + nameLbl_width
+            ac.setSize(t_optBg, raceOptionLbl_width, fontSize + 2)
+            ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y + 4)
             ####
             ac.setText(modeButton, "INTERVAL")
             ac.setVisible(t_intervalLbl,1)
@@ -658,7 +696,7 @@ def acUpdate(deltaT):
                     intervalToLabel_gate(t_intervalLbl, idxB, t_carAhead)
                 else:
                     ac.setText(t_intervalLbl,"-")
-                ac.setFontAlignment(t_intervalLbl,"right")
+                ac.setFontAlignment(t_intervalLbl,"left")
         else:
             ac.setVisible(t_intervalLbl,0)
         if raceOptionnalEnum == 1: #If raceoptionna is gap to leader
@@ -682,7 +720,7 @@ def acUpdate(deltaT):
                         intervalToLabel_gate(t_gapToLeadLbl,idxB,t_carAhead)
                 else:
                     ac.setText(t_gapToLeadLbl,"-")
-                ac.setFontAlignment(t_gapToLeadLbl,"right")
+                ac.setFontAlignment(t_gapToLeadLbl,"left")
         else:
             ac.setVisible(t_gapToLeadLbl, 0)
         if raceOptionnalEnum == 2:
@@ -691,17 +729,13 @@ def acUpdate(deltaT):
             raceOptionLbl_left = tyreCompound_left + (tyreCompound_width*1)
             ac.setText(modeButton, "TYRE")
             ac.setSize(t_optBg,tyreCompound_width+fontSize,fontSize+2)
-            ac.setPosition(t_optBg,tyreCompound_left-tyreCompound_width-4,t_Lbl_y+4)
+            ac.setPosition(t_optBg,tyreCompound_left,t_Lbl_y+4)
             ac.setVisible(t_stintLbl_txt,1)
             ac.setVisible(t_tyreBg,1)
             ac.setVisible(t_tyreIcon,1)
-            ac.setPosition(t_tyreIcon,tyreCompound_left-tyreCompound_width,t_Lbl_y+5)
-            ac.setPosition(t_stintLbl_txt,tyreCompound_left-tyreCompound_width+fontSize+2,t_Lbl_y)
-            #ac.setPosition(t_stintLbl_bg, raceOptionLbl_left, t_Lbl_y+5)
-            #ac.setPosition(t_stintLbl_bg, raceOptionLbl_left, t_Lbl_y + 5)
-            #ac.setText(t_stintLbl,"test")
+            ac.setPosition(t_tyreIcon,tyreCompound_left+2,t_Lbl_y+5)
+            ac.setPosition(t_stintLbl_txt,tyreCompound_left+fontSize+4,t_Lbl_y)
             if currentUpdateTime >= nextUpdate:
-
                 t_currentTyre = allDrivers[idxB].currentTyre
                 ac.setText(t_stintLbl_txt, "{} L".format(allDrivers[idxB].currentStintLenght))
                 #ac.log("{}".format(t_currentTyre))
