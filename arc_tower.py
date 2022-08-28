@@ -27,7 +27,7 @@ import ctypes
 from sim_info_lib.sim_info import info
 
 # TODO : Find a way for tyre life to get +1 when pitbox is before start/finish line
-#
+# TODO : Revisit fastest lap logic
 
 # HANDLE .INI File #
 #configfile = os.path.join(os.path.dirname(__file__), 'arc_tower.ini')
@@ -111,6 +111,11 @@ class Label:
         ac.addOnClickedListener(self.button, self.partial_func)
 
         #Overlay for visual cues
+        ##Pitstop
+        self.pitstopOverlay = ac.addLabel(window, "")
+        ac.setVisible(self.pitstopOverlay, 0)
+        ac.setBackgroundTexture(self.pitstopOverlay, img_over_pitstop)
+        ##Purple Lap
         self.purpleOverlay = ac.addLabel(window,"")
         ac.setVisible(self.purpleOverlay,0)
         ac.setBackgroundTexture(self.purpleOverlay,img_over_fastest_lap)
@@ -268,11 +273,11 @@ positionLbl_width = fontSize*0.33
 positionLbl_left = positionLbl_width
 
 #NAME
-nameLbl_left = positionLbl_left + positionLbl_width
-nameLbl_width = longestName
+nameLbl_left = positionLbl_left + positionLbl_width - 4
+nameLbl_width = longestName + fontSize
 
 ## Compound
-tyreCompound_left = nameLbl_left + nameLbl_width
+tyreCompound_left = nameLbl_left + nameLbl_width - 2
 tyreCompound_widthConstant = 48
 tyreCompound_width = tyreCompound_widthConstant
 
@@ -280,6 +285,9 @@ tyreCompound_width = tyreCompound_widthConstant
 raceOptionLbl_left = tyreCompound_left + tyreCompound_width
 raceOptionLbl_width = fontSize*3
 
+#Misc
+miscLbl_left = raceOptionLbl_left + raceOptionLbl_width
+miscLbl_width = fontSize
 
 #Pitstop
 pitstop_width = fontSize
@@ -293,7 +301,7 @@ def acMain(ac_versions):
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h
     global img_bg_vert, img_bg_vert_66p, img_over_fastest_lap, img_bg_vert_pit, img_bg_vert_pit_66p, img_bg_vert_red
-    global bg_tower_top
+    global bg_tower_top, img_over_pitstop
 
     # HANDLE Sprites #
     #Misc
@@ -302,6 +310,7 @@ def acMain(ac_versions):
     img_bg_vert_pit = os.path.dirname(__file__) + '/img/bg_vert_pit.png'
     img_bg_vert_pit_66p = os.path.dirname(__file__) + '/img/bg_vert_pit_66p.png'
     img_over_fastest_lap = os.path.dirname(__file__) + '/img/over_fastest_lap.png'
+    img_over_pitstop = os.path.dirname(__file__) + '/img/over_pitstop.png'
     img_bg_vert_red = os.path.dirname(__file__) + '/img/bg_vert_arc_red.png'
     #Tower
     img_bg_tower_top = os.path.dirname(__file__) + '/img/bg_tower_top.png'
@@ -392,7 +401,7 @@ def acMain(ac_versions):
 def acUpdate(deltaT):
     global mainWindow, sessionLbl_name, sessionLbl_time, modeButton
     global positionLbl_left, nameLbl_left, nameLbl_width, raceOptionLbl_left, tyreCompound_left, raceOptionLbl_width
-    global currentSession, currentSessionStrg, trackLength
+    global currentSession, currentSessionStrg, trackLength, miscLbl_left
     global raceOptionnalEnum, session_purple_lap
     global nextUpdate, refreshRate, currentUpdateTime
     global config, sector_1, sector_2
@@ -401,9 +410,9 @@ def acUpdate(deltaT):
     global longestName, allDrivers, allLabels
     global leaderboard, leaderboardDict, modeLbl
     global img_over_fastest_lap, img_bg_vert, img_bg_vert_66p , tyreCompound_width, tyreCompound_widthConstant
-    global bg_tower_top, img_bg_vert_pit, img_bg_vert_pit_66p, img_bg_vert_red
+    global bg_tower_top, img_bg_vert_pit, img_bg_vert_pit_66p, img_bg_vert_red, img_over_pitstop
 
-    ac.setSize(bg_tower_top, positionLbl_width + nameLbl_width + fontSize, (positionLbl_width + nameLbl_width + fontSize)*0.7)
+    ac.setSize(bg_tower_top, 250, 250)
     ac.setPosition(bg_tower_top, positionLbl_left - (fontSize * 1.1), -75)
 
     ac.setBackgroundOpacity(mainWindow, 0)
@@ -473,9 +482,10 @@ def acUpdate(deltaT):
             #ac.log("{}".format(allLabels[idx].parentCar))
             allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
-    longestName = getLongestGame(totalDrivers)-1
-    nameLbl_width = (longestName*(fontSize*1))-(fontSize*2)
+    longestName = getLongestGame(totalDrivers)
+    nameLbl_width = (longestName*fontSize)
     raceOptionLbl_left = tyreCompound_left + (tyreCompound_width*1)
+    miscLbl_left = raceOptionLbl_left + raceOptionLbl_width+4
 
     #Update leaderboard
     for idxC in range(len(leaderboard)): # idxC = [carId,distance]
@@ -606,7 +616,7 @@ def acUpdate(deltaT):
         t_tyreIcon = t_label.tyreIcon
         t_pitstopLbl = t_label.inPit
         t_purpleCues = t_label.purpleOverlay
-
+        t_pitstopCues = t_label.pitstopOverlay
         #######################################################
 
 
@@ -676,7 +686,8 @@ def acUpdate(deltaT):
         #VISUAL.CUES
         ac.setSize(t_purpleCues,nameLbl_width,fontSize+2)
         ac.setPosition(t_purpleCues, nameLbl_left - 2, t_Lbl_y + 4)
-
+        ac.setSize(t_pitstopCues,nameLbl_width,fontSize+2)
+        ac.setPosition(t_pitstopCues, nameLbl_left - 2, t_Lbl_y + 4)
         if t_personal_purple == session_purple_lap:
             #ac.log("Set background for purple")
             #ac.setBackgroundTexture(t_nameBg, img_bg_fastest_lap)
@@ -687,9 +698,7 @@ def acUpdate(deltaT):
 
         #OPTIONAL.BACKGROUND
         ac.setBackgroundTexture(t_optBg, img_bg_vert_66p)
-        #ac.setSize(t_optBg, raceOptionLbl_width, fontSize+2)
-        #ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y+4)
-        ac.setBackgroundOpacity(t_optBg,0.66)
+        #ac.setBackgroundOpacity(t_optBg,0.66)
 
 
         #INVISIBLE BUTTON TO SELECT CARS
@@ -699,7 +708,7 @@ def acUpdate(deltaT):
         #ac.setVisible(modeLbl,1)
         if raceOptionnalEnum == 0: #If raceoptionnal is intervals...
             #BACKGROUND
-            tyreCompound_left = nameLbl_left + nameLbl_width
+            tyreCompound_left = nameLbl_left + nameLbl_width - 2
             ac.setSize(t_optBg, raceOptionLbl_width, fontSize + 2)
             ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y + 4)
             ####
@@ -724,6 +733,9 @@ def acUpdate(deltaT):
         else:
             ac.setVisible(t_intervalLbl,0)
         if raceOptionnalEnum == 1: #If raceoptionna is gap to leader
+            tyreCompound_left = nameLbl_left + nameLbl_width - 2
+            ac.setSize(t_optBg, raceOptionLbl_width, fontSize + 2)
+            ac.setPosition(t_optBg, raceOptionLbl_left, t_Lbl_y + 4)
             ac.setVisible(t_gapToLeadLbl,1)
             ac.setText(modeButton,"TO LEADER")
             t_carChaserCurrentLap = ac.getCarState(idxB,acsys.CS.LapCount)
@@ -749,8 +761,9 @@ def acUpdate(deltaT):
             ac.setVisible(t_gapToLeadLbl, 0)
         if raceOptionnalEnum == 2:
             tyreCompound_width = tyreCompound_widthConstant
-            tyreCompound_left = nameLbl_left + nameLbl_width
+            tyreCompound_left = nameLbl_left + nameLbl_width - 2
             raceOptionLbl_left = tyreCompound_left + (tyreCompound_width*1)
+            miscLbl_left = raceOptionLbl_left + fontSize + 4
             ac.setText(modeButton, "TYRE")
             ac.setSize(t_optBg,tyreCompound_width+fontSize,fontSize+2)
             ac.setPosition(t_optBg,tyreCompound_left,t_Lbl_y+4)
@@ -792,23 +805,16 @@ def acUpdate(deltaT):
 
         if allDrivers[idxB].inPitLane and ac.isConnected(idxB):
             ac.setVisible(t_pitstopLbl,1)
-            ac.setPosition(t_pitstopLbl,raceOptionLbl_left+pitstop_width,t_Lbl_y)
+            ac.setPosition(t_pitstopLbl,miscLbl_left,t_Lbl_y)
             ac.setText(t_pitstopLbl,"P")
-            ac.setBackgroundTexture(t_nameBg, img_bg_vert_pit)
-            ac.setBackgroundTexture(t_optBg, img_bg_vert_pit_66p)
-            ac.setBackgroundTexture(t_stintLbl_bg, img_bg_vert_pit_66p)
-            ac.setBackgroundTexture(t_tyreBg, img_bg_vert_pit_66p)
+            ac.setVisible(t_pitstopCues,1)
         elif not ac.isConnected(idxB):
             ac.setVisible(t_pitstopLbl, 1)
-            ac.setPosition(t_pitstopLbl, raceOptionLbl_left + pitstop_width, t_Lbl_y)
+            ac.setPosition(t_pitstopLbl, miscLbl_left, t_Lbl_y)
             ac.setText(t_pitstopLbl, "D")
         else:
             ac.setVisible(t_pitstopLbl,0)
-            ac.setBackgroundTexture(t_nameBg, img_bg_vert)
-            ac.setBackgroundTexture(t_optBg, img_bg_vert_66p)
-            ac.setBackgroundTexture(t_stintLbl_bg, img_bg_vert_66p)
-            ac.setBackgroundTexture(t_tyreBg, img_bg_vert_66p)
-
+            ac.setVisible(t_pitstopCues, 0)
 
     if currentUpdateTime >= nextUpdate:
         nextUpdate = time.time() + refreshRate
