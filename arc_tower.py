@@ -303,6 +303,8 @@ def acMain(ac_versions):
     global img_bg_vert, img_bg_vert_66p, img_over_fastest_lap, img_bg_vert_pit, img_bg_vert_pit_66p, img_bg_vert_red
     global bg_tower_top, img_over_pitstop
 
+    ac.initFont(0,"Arial",0,0)
+
     # HANDLE Sprites #
     #Misc
     img_bg_vert = os.path.dirname(__file__) + '/img/bg_vert.png'
@@ -407,7 +409,7 @@ def acUpdate(deltaT):
     global config, sector_1, sector_2
     global gate_0, gate_1, gate_2, gate_3, gate_4, gate_5, gate_6, gate_7, gate_8
     global img_tyre_s, img_tyre_m, img_tyre_h, tyre_icon_x, tyre_icon_y
-    global longestName, allDrivers, allLabels
+    global longestName, allDrivers, allLabels, t_longestName, t_longestNameFontSize
     global leaderboard, leaderboardDict, modeLbl
     global img_over_fastest_lap, img_bg_vert, img_bg_vert_66p , tyreCompound_width, tyreCompound_widthConstant
     global bg_tower_top, img_bg_vert_pit, img_bg_vert_pit_66p, img_bg_vert_red, img_over_pitstop
@@ -472,6 +474,9 @@ def acUpdate(deltaT):
             allDrivers.update({idx:Driver(idx)})
             leaderboard.append([allDrivers[idx].id,allDrivers[idx].distanceTraveled])
             #ac.log("Lead.Append : {}".format(leaderboard))
+            t_longestName = getLongestGame(totalDrivers)
+            t_longestNameFontSize = GetTextDimensions(t_longestName[1], fontSize, "Arial")
+            ac.log("{}".format(t_longestNameFontSize))
         if not idx in allLabels.keys():
             allLabels.update({idx:Label(mainWindow,idx)})
             allLabels[idx].parentCar = idx
@@ -482,8 +487,12 @@ def acUpdate(deltaT):
             #ac.log("{}".format(allLabels[idx].parentCar))
             allDrivers[idx].lblId = idx
     # SETUP LONGEST NAME #
-    longestName = getLongestGame(totalDrivers)
-    nameLbl_width = (longestName*fontSize)
+    #t_longestName = getLongestGame(totalDrivers)
+
+    #longestName = t_longestName[0]
+
+
+    nameLbl_width = t_longestNameFontSize[0]
     raceOptionLbl_left = tyreCompound_left + (tyreCompound_width*1)
     miscLbl_left = raceOptionLbl_left + raceOptionLbl_width+4
 
@@ -811,7 +820,10 @@ def acUpdate(deltaT):
         elif not ac.isConnected(idxB):
             ac.setVisible(t_pitstopLbl, 1)
             ac.setPosition(t_pitstopLbl, miscLbl_left, t_Lbl_y)
-            ac.setText(t_pitstopLbl, "D")
+            ac.setText(t_pitstopLbl, "")
+            ac.setFontColor(t_nameLbl,1,1,1,0.2)
+            ac.setFontColor(t_posLbl, 1, 1, 1, 0.2)
+            ac.setFontColor(t_stintLbl_txt,1,1,1,0.2)
         else:
             ac.setVisible(t_pitstopLbl,0)
             ac.setVisible(t_pitstopCues, 0)
@@ -983,12 +995,15 @@ def getGateValueOfCar(id,gateNumber):
 def getLongestGame(carCount):
     try:
         t_longestName = 0
+        t_longestNameArr = []
         for i in range(carCount):
             t_lenght = len(getLastName(ac.getDriverName(i)))
             if t_lenght > t_longestName:
+                t_longestNameArr = [t_lenght,getLastName(ac.getDriverName(i))]
                 t_longestName = t_lenght
-        #ac.log("Longest Name : {}".format(t_longestName))
-        return t_longestName
+               #ac.log("{}".format(t_longestName))
+        ac.log("Longest Name : {}".format(t_longestNameArr))
+        return t_longestNameArr
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ getLongestGame()")
@@ -1034,3 +1049,15 @@ def onClickFocusCar(*args):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         ac.log("Error @ onClickFocusCar()")
         ac.log("{}".format(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+def GetTextDimensions(text, points, font):
+    class SIZE(ctypes.Structure):
+        _fields_ = [("cx", ctypes.c_long), ("cy", ctypes.c_long)]
+
+    hdc = ctypes.windll.user32.GetDC(0)
+    hfont = ctypes.windll.gdi32.CreateFontA(-points, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, font)
+    hfont_old = ctypes.windll.gdi32.SelectObject(hdc, hfont)
+    size = SIZE(0, 0)
+    ctypes.windll.gdi32.GetTextExtentPoint32A(hdc, text, len(text), ctypes.byref(size))
+    ctypes.windll.gdi32.SelectObject(hdc, hfont_old)
+    ctypes.windll.gdi32.DeleteObject(hfont)
+    return (size.cx, size.cy)
